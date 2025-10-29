@@ -18,6 +18,9 @@ body {
 
   #map {
       flex-grow: 1;
+    width: 100%;
+        height: 100vh;
+        /* ou 500px, o que preferir */
   }
 
   .top-bar {
