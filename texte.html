@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sistema de Alertas da Defesa Civil</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            background-color: #d32f2f;
+            color: white;
+            text-align: center;
+            padding: 12px 0;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        #map {
+            flex-grow: 1;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: center;
+            background-color: #fff;
+            border-bottom: 1px solid #ccc;
+            padding: 10px;
+        }
+
+        .top-bar button {
+            background-color: #d32f2f;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: 0.3s;
+        }
+
+        .top-bar button:hover {
+            background-color: #b71c1c;
+        }
+
+        footer {
+            text-align: center;
+            padding: 8px;
+            background: #222;
+            color: white;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+
+<body>
+    <header>🚨 Sistema de Alertas da Defesa Civil – IFF 🌎</header>
+
+    <div class="top-bar">
+        <button onclick="window.open('forms.gle/a89YTjoN8MAjMQ438', '_blank')">
+            ➕ Adicionar Ocorrência
+        </button>
+    </div>
+
+    <div id="map"></div>
+
+    <footer>Desenvolvido como projeto acadêmico – Instituto Federal Fluminense</footer>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS0BYnMDSIOZYk9j0jHb8E6VRyswAEtvXj73TjG0ldGSyGpxuxhLZLMcp-c-guuY4-xrV2xntDX9rDN/pub?gid=658388342&single=true&output=csv"; // deve terminar com ?output=csv
+
+        const map = L.map("map").setView([-22.9194, -42.8184], 12); // Maricá, RJ
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: "&copy; OpenStreetMap contributors",
+        }).addTo(map);
+
+        async function getCSVData() {
+            const response = await fetch(SHEET_URL);
+            const text = await response.text();
+            const rows = text.split("\n").map((r) => r.split(","));
+            const headers = rows.shift().map((h) => h.trim());
+            const data = rows.map((r) =>
+                headers.reduce((obj, key, i) => ({ ...obj, [key]: r[i] }), {})
+            );
+            return data.filter(d => d && Object.keys(d).length > 0);
+        }
+
+        async function geocode(address) {
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            return data[0] ? [parseFloat(data[0].lat), parseFloat(data[0].lon)] : null;
+        }
+
+        async function plotData() {
+            const data = await getCSVData();
+            for (const item of data) {
+                const endereco = item["Endereço"] || item["Endereco"] || item["Local"] || "";
+                if (!endereco) continue;
+                const coords = await geocode(endereco);
+                if (coords) {
+                    L.marker(coords)
+                        .addTo(map)
+                        .bindPopup(`
+              <b>${item["Tipo de Ocorrência"] || item["Tipo"] || "Ocorrência"}</b><br>
+              <b>Severidade:</b> ${item["Severidade"] || item["Nível"] || "—"}<br>
+              <b>Endereço:</b> ${endereco}<br>
+              <b>Descrição:</b> ${item["Descrição"] || item["Observação"] || "—"}
+            `);
+                }
+            }
+        }
+
+        plotData();
+    </script>
+</body>
+
+</html>
