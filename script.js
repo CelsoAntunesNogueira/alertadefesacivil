@@ -10,7 +10,7 @@ const SHEET_URL =
         }).addTo(map);
 
     async function getCSVData() {
-            const response = await fetch(SHEET_URL);
+        const response = await fetch("https://docs.google.com/spreadsheets/d/18H1lySpJKaCk3dHMJTLHQ-GW7Ap5NHF-zGuKnRp71TA/edit?usp=sharing");
     const text = await response.text();
             const rows = text.split("\n").map((r) => r.split(","));
             const headers = rows.shift().map((h) => h.trim());
