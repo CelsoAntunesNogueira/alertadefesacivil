@@ -101,16 +101,39 @@ async function geocode(address) {
   }
 }
 
-// Ícone personalizado do marcador (resolve problema de ícone não aparecer)
-const customIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
+// Função para obter cor baseada na severidade
+function getMarkerColor(severidade) {
+  const sev = (severidade || "").toLowerCase().trim();
+  
+  if (sev.includes("alta") || sev.includes("alto") || sev.includes("crítica") || sev.includes("critica")) {
+    return '#d32f2f'; // Vermelho - Alta
+  } else if (sev.includes("média") || sev.includes("media") || sev.includes("moderada")) {
+    return '#ff9800'; // Laranja - Média
+  } else if (sev.includes("baixa") || sev.includes("leve")) {
+    return '#ffd700'; // Amarelo - Baixa
+  } else {
+    return '#2196F3'; // Azul - Sem classificação
+  }
+}
+
+// Função para criar ícone colorido
+function createColoredIcon(color) {
+  const svgIcon = `
+    <svg width="25" height="41" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12.5 0C5.6 0 0 5.6 0 12.5c0 8.4 12.5 28.5 12.5 28.5S25 20.9 25 12.5C25 5.6 19.4 0 12.5 0z" 
+            fill="${color}" stroke="#fff" stroke-width="1.5"/>
+      <circle cx="12.5" cy="12.5" r="6" fill="#fff" opacity="0.9"/>
+    </svg>
+  `;
+  
+  return L.divIcon({
+    html: svgIcon,
+    className: 'custom-marker',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34]
+  });
+}
 
 // Lê os dados e plota no mapa
 async function plotData() {
@@ -142,16 +165,26 @@ async function plotData() {
       const coords = await geocode(endereco);
       
       if (coords) {
-        L.marker(coords, { icon: customIcon })
+        const severidade = item["Severidade"] || item["Nível"] || item["Nivel"] || "";
+        const markerColor = getMarkerColor(severidade);
+        const icon = createColoredIcon(markerColor);
+        
+        L.marker(coords, { icon: icon })
           .addTo(map)
           .bindPopup(`
-            <b>${item["Tipo de Ocorrência"] || item["Tipo"] || "Ocorrência"}</b><br>
-            <b>Severidade:</b> ${item["Severidade"] || item["Nível"] || item["Nivel"] || "—"}<br>
-            <b>Endereço:</b> ${endereco}<br>
-            <b>Descrição:</b> ${item["Descrição"] || item["Descricao"] || item["Observação"] || "—"}
+            <div style="min-width: 200px;">
+              <b style="color: ${markerColor}; font-size: 1.1em;">
+                ${item["Tipo de Ocorrência"] || item["Tipo"] || "Ocorrência"}
+              </b><br>
+              <b>Severidade:</b> <span style="color: ${markerColor}; font-weight: bold;">
+                ${severidade || "Não informada"}
+              </span><br>
+              <b>Endereço:</b> ${endereco}<br>
+              <b>Descrição:</b> ${item["Descrição"] || item["Descricao"] || item["Observação"] || "—"}
+            </div>
           `);
         markerCount++;
-        console.log(`Marcador ${markerCount} adicionado em:`, coords);
+        console.log(`Marcador ${markerCount} adicionado em:`, coords, `- Severidade: ${severidade}`);
       } else {
         console.warn(`Não foi possível geocodificar: ${endereco}`);
       }
