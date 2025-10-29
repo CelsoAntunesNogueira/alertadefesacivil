@@ -12,13 +12,13 @@ const SHEET_URL =
     async function getCSVData() {
         const response = await fetch("https://docs.google.com/spreadsheets/d/18H1lySpJKaCk3dHMJTLHQ-GW7Ap5NHF-zGuKnRp71TA/edit?usp=sharing");
     const text = await response.text();
-            const rows = text.split("\n").map((r) => r.split(","));
-            const headers = rows.shift().map((h) => h.trim());
-            const data = rows.map((r) =>
-                headers.reduce((obj, key, i) => ({...obj, [key]: r[i] }), { })
+    const rows = text.split("\n").map(r => r.split(","));
+    const headers = rows.shift().map(h => h.trim());
+    const data = rows.map(r =>
+        headers.reduce((obj, key, i) => ({ ...obj, [key]: r[i] }), {})
     );
-            return data.filter(d => d && Object.keys(d).length > 0);
-        }
+    return data.filter(d => d && Object.keys(d).length > 0);
+}
 
     async function geocode(address) {
             const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
@@ -47,3 +47,4 @@ const SHEET_URL =
         }
 
     plotData();
+
