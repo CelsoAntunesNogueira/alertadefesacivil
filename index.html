@@ -15,18 +15,19 @@
     <header>🚨 Sistema de Alertas da Defesa Civil – IFF 🌎</header>
 
     <div class="top-bar">
-        <button onclick="window.open('https://forms.gle/a89YTjoN8MAjMQ438', '_blank')">
-            ➕ Adicionar Ocorrência
-        </button>
+        <p>Marque o local da ocorrência.</p>
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="🔍 Buscar estado ou cidade..." />
+            <button id="searchBtn">Buscar</button>
+        </div>
     </div>
 
     <div id="map"></div>
 
-    <footer>Desenvolvido por Celso como projeto acadêmico – Instituto Federal Fluminense</footer>
+    <footer>Desenvolvido por Celso Antunes como projeto acadêmico – Instituto Federal Fluminense</footer>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="script.js"></script>
 
 </body>
 
 </html>
-
