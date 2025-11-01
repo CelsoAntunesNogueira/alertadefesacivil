@@ -54,3 +54,33 @@ body {
       font-size: 0.9em;
   }
 
+.search-container {
+    display: flex;
+    align-items: center;
+    margin-left: 15px;
+    gap: 5px;
+}
+
+.search-container input {
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 1em;
+    width: 220px;
+}
+
+.search-container button {
+    background-color: #1976d2;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 1em;
+    transition: 0.3s;
+}
+
+.search-container button:hover {
+    background-color: #125ca1;
+}
+
