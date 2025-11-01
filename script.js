@@ -1,5 +1,9 @@
 // URL da planilha publicada como CSV
-const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS0BYnMDSIOZYk9j0jHb8E6VRyswAEtvXj73TjG0ldGSyGpxuxhLZLMcp-c-guuY4-xrV2xntDX9rDN/pub?output=csv";
+const SHEET_URL =
+  "https://api.allorigins.win/get?url=" +
+  encodeURIComponent(
+    "https://docs.google.com/spreadsheets/d/e/2PACX-1vS0BYnMDSIOZYk9j0jHb8E6VRyswAEtvXj73TjG0ldGSyGpxuxhLZLMcp-c-guuY4-xrV2xntDX9rDN/pub?output=csv"
+  );
 
 // Inicializa o mapa centrado em Maricá - RJ
 const map = L.map("map").setView([-22.9194, -42.8184], 12);
@@ -7,7 +11,7 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "&copy; OpenStreetMap contributors",
 }).addTo(map);
 
-// Parser de CSV mais resistente
+// Parser CSV robusto
 function parseCSV(text) {
   const rows = [];
   let current = [];
@@ -40,170 +44,153 @@ function parseCSV(text) {
   return rows;
 }
 
-// Função para buscar e processar o CSV
+// Buscar e processar CSV
 async function getCSVData() {
-  try {
-    // Tenta buscar direto primeiro
-    let response = await fetch(SHEET_URL, { mode: 'cors' });
-    let text = await response.text();
-    
-    // Se não funcionar, mostra no console
-    console.log("Resposta recebida:", text.substring(0, 200));
-    
-    const rows = parseCSV(text);
-    console.log("Linhas parseadas:", rows);
-    
-    if (rows.length === 0) {
-      throw new Error("Nenhuma linha encontrada no CSV");
-    }
-    
-    const headers = rows[0].map((h) => h.trim());
-    console.log("Headers encontrados:", headers);
-    
-    const data = rows.slice(1).map((r) =>
-      headers.reduce((obj, key, i) => ({ ...obj, [key]: r[i] || "" }), {})
-    );
-    
-    console.log("Dados processados:", data);
-    return data.filter((d) => d && Object.keys(d).length > 0);
-  } catch (err) {
-    console.error("Erro ao buscar CSV:", err);
-    alert("Erro ao carregar dados da planilha. Verifique o console para mais detalhes.");
-    return [];
-  }
+  const response = await fetch(SHEET_URL);
+  const json = await response.json();
+  const text = json.contents;
+  const rows = parseCSV(text);
+  const headers = rows.shift().map((h) => h.trim());
+  const data = rows.map((r) =>
+    headers.reduce((obj, key, i) => ({ ...obj, [key]: r[i] }), {})
+  );
+  return data.filter((d) => d && Object.keys(d).length > 0);
 }
 
-// Delay entre requisições
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// Geocodificação com OpenStreetMap
+// Geocodificação via OpenStreetMap
 async function geocode(address) {
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+    address + ", Maricá, RJ"
+  )}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  return data[0] ? [parseFloat(data[0].lat), parseFloat(data[0].lon)] : null;
+}
+
+// Reverse geocode para exibir endereço resumido
+async function reverseGeocode(lat, lng) {
   try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-      address + ", Maricá, RJ, Brasil"
-    )}`;
-    
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'DefesaCivilIFF/1.0'
-      }
-    });
-    
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
+    const res = await fetch(url);
     const data = await res.json();
-    console.log(`Geocode para "${address}":`, data);
-    
-    return data[0] ? [parseFloat(data[0].lat), parseFloat(data[0].lon)] : null;
+    if (data && data.address) {
+      const { road, suburb, city, state } = data.address;
+      return [road, suburb, city, state].filter(Boolean).join(", ");
+    }
+    return "";
   } catch (err) {
-    console.error(`Erro ao geocodificar "${address}":`, err);
-    return null;
+    console.error("Erro no reverse geocode:", err);
+    return "";
   }
 }
 
-// Função para obter cor baseada na severidade
-function getMarkerColor(severidade) {
-  const sev = (severidade || "").toLowerCase().trim();
-  
-  if (sev.includes("alta") || sev.includes("alto") || sev.includes("crítica") || sev.includes("critica")) {
-    return '#d32f2f'; // Vermelho - Alta
-  } else if (sev.includes("média") || sev.includes("media") || sev.includes("moderada")) {
-    return '#ff9800'; // Laranja - Média
-  } else if (sev.includes("baixa") || sev.includes("leve")) {
-    return '#ffd700'; // Amarelo - Baixa
-  } else {
-    return '#2196F3'; // Azul - Sem classificação
-  }
-}
-
-// Função para criar ícone colorido
-function createColoredIcon(color) {
-  const svgIcon = `
-    <svg width="25" height="41" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12.5 0C5.6 0 0 5.6 0 12.5c0 8.4 12.5 28.5 12.5 28.5S25 20.9 25 12.5C25 5.6 19.4 0 12.5 0z" 
-            fill="${color}" stroke="#fff" stroke-width="1.5"/>
-      <circle cx="12.5" cy="12.5" r="6" fill="#fff" opacity="0.9"/>
-    </svg>
-  `;
-  
-  return L.divIcon({
-    html: svgIcon,
-    className: 'custom-marker',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34]
-  });
-}
-
-// Lê os dados e plota no mapa
+// Plotar dados no mapa
 async function plotData() {
   try {
-    console.log("Iniciando carregamento dos dados...");
     const data = await getCSVData();
-    
-    if (data.length === 0) {
-      console.warn("Nenhum dado encontrado para plotar");
-      alert("Nenhuma ocorrência encontrada na planilha.");
-      return;
-    }
-    
-    console.log(`${data.length} registros encontrados. Geocodificando...`);
-    let markerCount = 0;
-
     for (const item of data) {
-      // Tenta diferentes nomes de colunas
-      const endereco = item["Endereço"] || item["Endereco"] || 
-                       item["Local"] || item["Localização"] || 
-                       item["Localizacao"] || "";
-      
-      if (!endereco || endereco.trim() === "") {
-        console.warn("Item sem endereço:", item);
-        continue;
-      }
+      const endereco =
+        item["Endereço"] || item["Endereco"] || item["Local"] || "";
+      if (!endereco) continue;
 
-      console.log(`Geocodificando: ${endereco}`);
       const coords = await geocode(endereco);
-      
       if (coords) {
-        const severidade = item["Severidade"] || item["Nível"] || item["Nivel"] || "";
-        const markerColor = getMarkerColor(severidade);
-        const icon = createColoredIcon(markerColor);
-        
-        L.marker(coords, { icon: icon })
+        L.marker(coords)
           .addTo(map)
           .bindPopup(`
-            <div style="min-width: 200px;">
-              <b style="color: ${markerColor}; font-size: 1.1em;">
-                ${item["Tipo de Ocorrência"] || item["Tipo"] || "Ocorrência"}
-              </b><br>
-              <b>Severidade:</b> <span style="color: ${markerColor}; font-weight: bold;">
-                ${severidade || "Não informada"}
-              </span><br>
-              <b>Endereço:</b> ${endereco}<br>
-              <b>Descrição:</b> ${item["Descrição"] || item["Descricao"] || item["Observação"] || "—"}
-            </div>
+            <b>${item["Tipo de Ocorrência"] || item["Tipo"] || "Ocorrência"}</b><br>
+            <b>Severidade:</b> ${item["Severidade"] || item["Nível"] || "—"}<br>
+            <b>Endereço:</b> ${endereco}<br>
+            <b>Descrição:</b> ${item["Descrição"] || item["Observação"] || "—"}
           `);
-        markerCount++;
-        console.log(`Marcador ${markerCount} adicionado em:`, coords, `- Severidade: ${severidade}`);
-      } else {
-        console.warn(`Não foi possível geocodificar: ${endereco}`);
       }
-      
-      // Aguarda 1 segundo entre requisições para não ser bloqueado
-      await delay(1000);
-    }
-    
-    console.log(`Total de marcadores plotados: ${markerCount}`);
-    
-    if (markerCount === 0) {
-      alert("Nenhum endereço pôde ser geocodificado. Verifique os endereços na planilha.");
     }
   } catch (err) {
-    console.error("Erro ao plotar dados:", err);
-    alert("Erro ao processar os dados. Verifique o console.");
+    console.error("Erro ao carregar dados:", err);
   }
 }
 
-// Inicia o processo
-console.log("Iniciando aplicação...");
+// Variáveis para controlar marcadores
+let selectedMarker = null; // clique no mapa
+let searchMarker = null;   // pesquisa da barra
+
+// Função de busca no mapa
+async function searchLocation() {
+  const query = document.getElementById("searchInput").value.trim();
+  if (!query) return;
+
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.length > 0) {
+      const { lat, lon, display_name } = data[0];
+
+      // Remove marcador de pesquisa anterior
+      if (searchMarker) map.removeLayer(searchMarker);
+
+      // Remove marcador do clique se existir
+      if (selectedMarker) {
+        map.removeLayer(selectedMarker);
+        selectedMarker = null;
+      }
+
+      map.setView([parseFloat(lat), parseFloat(lon)], 12);
+
+      searchMarker = L.marker([parseFloat(lat), parseFloat(lon)])
+        .addTo(map)
+        .bindPopup(`<b>${display_name}</b>`)
+        .openPopup();
+    }
+  } catch (err) {
+    console.error("Erro na busca:", err);
+  }
+}
+
+// Eventos de busca
+document.getElementById("searchBtn").addEventListener("click", searchLocation);
+document.getElementById("searchInput").addEventListener("keypress", (e) => {
+  if (e.key === "Enter") searchLocation();
+});
+
 plotData();
+
+// Clique no mapa → marcador + botão adicionar ocorrência
+map.on("click", async function (e) {
+  const { lat, lng } = e.latlng;
+
+  // Remove marcador anterior do clique
+  if (selectedMarker) map.removeLayer(selectedMarker);
+
+  // Remove marcador da pesquisa se existir
+  if (searchMarker) {
+    map.removeLayer(searchMarker);
+    searchMarker = null;
+  }
+
+  // Adiciona novo marcador
+  selectedMarker = L.marker([lat, lng]).addTo(map);
+
+  const latField = "entry.1650561563";
+  const lngField = "entry.1874651982";
+  const baseURL =
+    "https://docs.google.com/forms/d/e/1FAIpQLSdo3k_7nbueN94yNTLASRwgH0q_ee8rUu470CxppTX3XBkddw/viewform";
+  const formURL = `${baseURL}?usp=pp_url&${latField}=${lat.toFixed(
+    6
+  )}&${lngField}=${lng.toFixed(6)}`;
+
+  const enderecoResumido = await reverseGeocode(lat, lng);
+
+  selectedMarker.bindPopup(`
+    <div style="text-align:center;">
+      <b>Confirmar localização?</b><br>
+      <small>${enderecoResumido}</small><br><br>
+      <button onclick="window.open('${formURL}', '_blank')" 
+              style="background:#d32f2f;color:white;border:none;
+                     border-radius:6px;padding:8px 12px;cursor:pointer;">
+        ➕ Adicionar Ocorrência
+      </button>
+    </div>
+  `).openPopup();
+});
